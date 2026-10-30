@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Tech Support Assistant</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>🛠️ AI Tech Support <span class="badge" id="mode">rules + retrieval</span></h1>
+  <nav><a href="/" class="active">Assistant</a><a href="/knowledge">Knowledge</a><a href="/tickets">Tickets</a><a href="/docs">API</a></nav>
+</header>
+<main class="layout">
+  <section class="chat">
+    <div class="messages" id="messages"></div>
+    <div class="options" id="options"></div>
+    <form class="composer" id="composer">
+      <input id="input" autocomplete="off" placeholder="Describe your problem, e.g. “The printer says it's offline”">
+      <button class="primary" type="submit">Send</button>
+    </form>
+  </section>
+  <aside>
+    <div class="panel">
+      <h3>You</h3>
+      <label>Your name<input id="user" placeholder="e.g. Alex (Finance)"></label>
+    </div>
+    <div class="panel">
+      <h3>Session</h3>
+      <div class="kv"><span>Category</span><span id="s-cat">–</span></div>
+      <div class="kv"><span>Stage</span><span id="s-phase">describe</span></div>
+      <div class="kv"><span>Priority</span><span id="s-pri">–</span></div>
+      <div class="kv"><span>Progress</span><span id="s-step">–</span></div>
+      <div class="kv"><span>Device</span><span id="s-dev" style="text-align:right">–</span></div>
+      <button class="ghost" id="new" style="margin-top:10px;width:100%">↺ New issue</button>
+    </div>
+    <div class="panel">
+      <h3>Related knowledge base</h3>
+      <div id="articles" class="muted">Articles matching your problem will appear here.</div>
+    </div>
+  </aside>
+</main>
+<div class="modal" id="modal"><div class="box"><button class="ghost" style="float:right" onclick="closeModal()">✕</button><div id="modal-body"></div></div></div>
+<script src="/static/common.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

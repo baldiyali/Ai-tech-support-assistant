@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Knowledge · AI Tech Support</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>🛠️ AI Tech Support</h1>
+  <nav><a href="/">Assistant</a><a href="/knowledge" class="active">Knowledge</a><a href="/tickets">Tickets</a><a href="/docs">API</a></nav>
+</header>
+<div class="page">
+  <div class="grid2">
+    <div class="panel">
+      <h3>Upload a troubleshooting manual</h3>
+      <p class="muted">Upload .md, .txt or .pdf files (max 10 MB): printer manuals, vendor guides, internal how-tos.
+        They're split into chunks and indexed for retrieval. New uploads are marked <span class="tag uploaded">uploaded · unreviewed</span>
+        until approved.</p>
+      <form id="upload">
+        <div class="drop" id="drop">Drag a file here or <input type="file" id="file" accept=".md,.txt,.pdf"></div>
+        <label style="display:block;margin-top:10px">Title (optional)<input id="title" placeholder="e.g. Office printer manual (HP M404)"></label>
+        <button class="primary" style="margin-top:10px" type="submit">Upload &amp; index</button>
+        <span id="up-msg" class="muted" style="margin-left:8px"></span>
+      </form>
+    </div>
+    <div class="panel">
+      <h3>Ask the documentation</h3>
+      <p class="muted">Retrieval-augmented answer with citations from approved articles and uploaded manuals.</p>
+      <form id="ask" style="display:flex;gap:8px"><input id="q" placeholder="e.g. What does error 49 on the printer mean?" style="flex:1;margin:0">
+        <button class="primary">Ask</button></form>
+      <div id="answer" style="margin-top:12px"></div>
+    </div>
+  </div>
+  <div class="panel" style="margin-top:20px;padding:0;overflow:hidden">
+    <table><thead><tr><th>Document</th><th>Status</th><th>Origin</th><th>Chunks</th><th></th></tr></thead>
+      <tbody id="docs"></tbody></table>
+  </div>
+</div>
+<script src="/static/common.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+async function loadDocs() {
+  const docs = await (await fetch("/api/documents")).json();
+  $("docs").innerHTML = docs.map(d => `<tr>
+    <td><strong>${esc(d.title)}</strong><div class="muted">${esc(d.filename)}</div></td>
+    <td>${statusTag(d.status)}</td><td>${d.origin === "seed" ? "Seeded KB" : "Upload"}</td><td>${d.n_chunks}</td>
+    <td style="text-align:right">${d.origin === "upload" ? `
+      <button class="ghost" onclick="setStatus('${esc(d.id)}','${d.status === "approved" ? "uploaded" : "approved"}')">${d.status === "approved" ? "Unapprove" : "Approve"}</button>
+      <button class="ghost" onclick="del('${esc(d.id)}')">Delete</button>` : ""}</td></tr>`).join("");
+}
+async function setStatus(id, status) {
+  await fetch(`/api/documents/${encodeURIComponent(id)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
+  loadDocs();
+}
+async function del(id) {
+  if (!confirm("Delete this document from the index?")) return;
+  await fetch(`/api/documents/${encodeURIComponent(id)}`, { method: "DELETE" }); loadDocs();
+}
+$("upload").onsubmit = async e => {
+  e.preventDefault();
+  const f = $("file").files[0]; if (!f) { $("up-msg").textContent = "Choose a file first."; return; }
+  const fd = new FormData(); fd.append("file", f); if ($("title").value) fd.append("title", $("title").value);
+  $("up-msg").textContent = "Indexing…";
+  const res = await fetch("/api/documents", { method: "POST", body: fd });
+  const body = await res.json();
+  $("up-msg").textContent = res.ok ? `✔ Indexed "${body.title}" (${body.n_chunks} chunks)` : `⚠️ ${body.detail}`;
+  if (res.ok) { $("file").value = ""; $("title").value = ""; loadDocs(); }
+};
+const drop = $("drop");
+drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); $("file").files = e.dataTransfer.files; };
+$("ask").onsubmit = async e => {
+  e.preventDefault(); if (!$("q").value.trim()) return;
+  $("answer").innerHTML = "<span class='muted'>Searching…</span>";
+  const r = await (await fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question: $("q").value }) })).json();
+  $("answer").innerHTML = `<div class="msg bot" style="max-width:100%">${inlineMd(r.answer)}</div>
+    <div class="muted" style="margin:6px 0">mode: ${esc(r.mode)}</div>${sourcesHtml(r.sources)}`;
+};
+loadDocs();
+</script>
+</body>
+</html>

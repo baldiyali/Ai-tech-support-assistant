@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tickets · AI Tech Support</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>🛠️ AI Tech Support</h1>
+  <nav><a href="/">Assistant</a><a href="/knowledge">Knowledge</a><a href="/tickets" class="active">Tickets</a><a href="/docs">API</a></nav>
+</header>
+<div class="page">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <h2 style="margin:0">Support tickets</h2>
+    <label class="muted">Status
+      <select id="filter"><option value="">All</option><option>open</option><option>in_progress</option><option>resolved</option><option>closed</option></select>
+    </label>
+  </div>
+  <div class="panel" style="padding:0;overflow:hidden">
+    <table><thead><tr><th>ID</th><th>Priority</th><th>Status</th><th>Summary</th><th>User</th><th>Created</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="6" class="muted">Loading…</td></tr></tbody></table>
+  </div>
+</div>
+<div class="modal" id="modal"><div class="box"><button class="ghost" style="float:right" onclick="closeModal()">✕</button><div id="modal-body"></div></div></div>
+<script src="/static/common.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+async function load() {
+  const q = $("filter").value ? `?status=${$("filter").value}` : "";
+  const tickets = await (await fetch("/api/tickets" + q)).json();
+  $("rows").innerHTML = tickets.length ? tickets.map(t => `<tr class="row" data-id="${esc(t.id)}">
+    <td><strong>${esc(t.id)}</strong></td><td>${priBadge(t.priority)}</td><td>${esc(t.status)}</td>
+    <td>${esc(t.summary)}</td><td>${esc(t.user)}</td><td class="muted">${esc(new Date(t.created_at).toLocaleString())}</td></tr>`).join("")
+    : `<tr><td colspan="6" class="muted">No tickets yet. Escalate an issue from the assistant to create one.</td></tr>`;
+  document.querySelectorAll("tr.row").forEach(r => r.onclick = () => open(r.dataset.id));
+}
+async function open(id) {
+  const t = await (await fetch(`/api/tickets/${id}`)).json();
+  const statuses = ["open", "in_progress", "resolved", "closed"];
+  $("modal-body").innerHTML = ticketHtml(t) + `
+    <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+      <span class="muted">Update status:</span>
+      <select id="st">${statuses.map(s => `<option ${s === t.status ? "selected" : ""}>${s}</option>`).join("")}</select>
+      <button class="primary" id="save">Save</button>
+      <a class="muted" href="/api/tickets/${esc(t.id)}/text" target="_blank">Plain-text view</a>
+    </div>
+    <details style="margin-top:12px"><summary class="muted">Conversation transcript</summary>
+      ${t.transcript.map(m => `<div class="msg ${m.role === "user" ? "user" : "bot"}" style="margin:6px 0;max-width:100%">${inlineMd(m.text)}</div>`).join("")}
+    </details>`;
+  $("save").onclick = async () => {
+    await fetch(`/api/tickets/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: $("st").value }) });
+    closeModal(); load();
+  };
+  $("modal").classList.add("open");
+}
+function closeModal() { $("modal").classList.remove("open"); }
+$("modal").onclick = e => { if (e.target.id === "modal") closeModal(); };
+$("filter").onchange = load;
+load();
+</script>
+</body>
+</html>
